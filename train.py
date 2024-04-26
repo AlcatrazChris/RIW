@@ -11,6 +11,7 @@ from network.LowPassfitter import LowpassFilter
 from noise.guassian import GaussianNoise
 from noise.jpeg_compression import JpegCompression
 from noise.noiser import Noiser
+import datetime
 from noise.cropout import Cropout
 from noise.rotate import RotateImage
 # from noise.crop import Crop
@@ -24,6 +25,8 @@ def train():
     logger_name = "train_log"
     log_root = "log/"
     logger = utils.log_starter(logger_name, log_root, level=logging.INFO, out='tofile')
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    folder_name = f'runs/val_{timestamp}'
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model = Model(8).to(device)
@@ -114,7 +117,7 @@ def train():
         g_loss = np.mean(np.array(g_loss_history),axis=0)
         l_loss = np.mean(np.array(l_loss_history),axis=0)
         r_loss = np.mean(np.array(r_loss_history),axis=0)
-        h_loss = np.mean(np.array(h_loss_history),axis=0)
+        # h_loss = np.mean(np.array(h_loss_history),axis=0)
         current_lr = optim.param_groups[0]['lr']
         logger.info(f"Epoch: {epoch+1}/{config.epoch}, Current lr: {current_lr}, Loss: {epoch_loss[0].item():3f},"
                     f"g_loss: {g_loss[0].item():3f}|r_loss: {r_loss[0].item():3f}|l_loss: {l_loss[0].item():3f}")
@@ -161,11 +164,11 @@ def train():
                     secret_rev = iwt(secret_rev, device)
 
                     '''save images'''
-                    utils.save_images('runs/val_images', cover, secret, steg, secret_rev,epoch = val_epoch,id = idx)
+                    utils.save_images(folder_name, cover, secret, steg, secret_rev,epoch = val_epoch,id = idx)
 
                     '''calculate metrics'''
-                    metrics = Metrics(Image.open(f'runs/val_images/secret/secret_{val_epoch}_{idx:03d}.png'),
-                                      Image.open(f'runs/val_images/secret_rev/secret_rev_{val_epoch}_{idx:03d}.png'))
+                    metrics = Metrics(Image.open(f'{folder_name}/secret/secret_{val_epoch}_{idx:03d}.png'),
+                                      Image.open(f'{folder_name}/secret_rev/secret_rev_{val_epoch}_{idx:03d}.png'))
                     psnr = metrics.psnr()
                     PSNR.append(psnr)
                     ssim = metrics.ssim()
@@ -175,6 +178,7 @@ def train():
 
             logger.info(f"Avg PSNR:{np.mean(PSNR)},Avg SSIM:{np.mean(SSIM)},Avg BER:{np.mean(BER)}")
             print(f"Avg PSNR:{np.mean(PSNR)},Avg SSIM:{np.mean(SSIM)},Avg BER:{np.mean(BER)}")
+
             torch.save({'opt': optim.state_dict(), 'net': model.state_dict()},
                        config.MODEL_PATH + f'model_{epoch+1}_val.pt')
         if len(psnr_values and ssim_values) > 0:

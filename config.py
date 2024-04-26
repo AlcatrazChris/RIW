@@ -4,21 +4,21 @@ batch_size = 2
 val_batch_size = 4
 test_batch_size = 2
 init_scale = 0.9
-lr = 1e-8
+lr = 0.5
 weight_decay = 1e-4
 betas = (0.5, 0.999)
 epoch = 1000
 
 channels_in = 3
 
-lamda_guide = 3
-lamda_reconstruction = 5
-lamda_low_frequency = 1
+lamda_guide = 2
+lamda_reconstruction = 10
+lamda_low_frequency = 2
 lamda_color_l = 5
 
 #train
-cropsize = 224
-weight_step = 100
+cropsize = 256
+weight_step = 200
 gamma = 0.9
 device_ids = [0]
 

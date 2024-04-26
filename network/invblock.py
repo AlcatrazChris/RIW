@@ -2,10 +2,11 @@ import torch
 import torch.nn as nn
 import config as c
 from network.rrdb_denselayer import ResidualDenseBlock_out
+from network.covbnrelu import ConvBNReLU
 
 
 class INV_block(nn.Module):
-    def __init__(self, subnet_constructor=ResidualDenseBlock_out, clamp=c.clamp, harr=True, in_1=3, in_2=3):
+    def __init__(self, subnet_constructor=ConvBNReLU, clamp=c.clamp, harr=True, in_1=3, in_2=3):
         super().__init__()
         if harr:
             self.split_len1 = in_1 * 4
