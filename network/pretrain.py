@@ -1,3 +1,6 @@
+import os
+import matplotlib.pyplot as plt
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -6,106 +9,104 @@ from torch.utils.data import DataLoader
 from network.denoiser import DenoiseNet
 from noise.noiser import Noiser
 from noise.dropout import Dropout
-from noise.cropout import Cropout
 from noise.guassian import GaussianNoise
 from noise.jpeg_compression import JpegCompression
 from network.LowPassfitter import LowpassFilter
-from noise.rotate import RotateImage
-from noise.resize import Resize
-from PIL import Image
 from torchvision.utils import save_image
-import matplotlib.pyplot as plt
 from metrics import Metrics
-import numpy as np
+from tqdm import tqdm
+from PIL import Image
 
-# 数据预处理：添加随机噪声
-def noisy_data(data):
-    noise = torch.randn_like(data) * 0.4  # 调整噪声强度
-    noisy_data = data + noise
-    return noisy_data.clamp(0, 1)
-
-# 数据加载
-transform = transforms.Compose([
-    transforms.RandomHorizontalFlip(),
-    transforms.RandomVerticalFlip(),
-    transforms.Resize((1024, 1024)),
-    transforms.ToTensor(),
-])
-
-train_images = datasets.ImageFolder('../dataset/train/', transform)
-train_loader = DataLoader(train_images, batch_size=2, shuffle=True)
-
+# 设置超参数和设备
+batch_size = 16
+epochs = 500
+lr = 0.01
+save_model_dir = '../model/pretrain'
+save_image_dir = '../runs/pretrain'
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# 实例化去噪网络
-denoise_model = DenoiseNet(input_channels=3, output_channels=3).to(device)
-optimizer = optim.Adam(denoise_model.parameters(), lr=0.001)
-criterion = nn.MSELoss(reduction='sum')
+# 确保图像保存路径存在
+os.makedirs(save_image_dir, exist_ok=True)
 
-save_model_dir = "model/pretrain"
+# 数据预处理和加载
+def load_data():
+    transform = transforms.Compose([
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomVerticalFlip(),
+        transforms.Resize((1024, 1024)),
+        transforms.ToTensor(),
+    ])
+    train_images = datasets.ImageFolder('../dataset/train/', transform)
+    train_loader = DataLoader(train_images, batch_size=batch_size, shuffle=True)
+    return train_loader
+
+# 可视化和指标评估
+def visualize_and_metrics(epoch, noisy_data, output):
+    # 确保张量在转换为NumPy数组前已经移至CPU
+    noisy_img = noisy_data[0].cpu().detach().clamp(0, 1).numpy().transpose(1, 2, 0)
+    output_img = output[0].cpu().detach().clamp(0, 1).numpy().transpose(1, 2, 0)
+
+    # 绘制并保存图像而不是显示
+    fig, axs = plt.subplots(1, 2, figsize=(12, 6))
+    axs[0].imshow(noisy_img)
+    axs[0].set_title('Noisy Image')
+    axs[0].axis('off')
+
+    axs[1].imshow(output_img)
+    axs[1].set_title('Denoised Image')
+    axs[1].axis('off')
+
+    # 图像保存路径
+    plt.savefig(os.path.join(save_image_dir, f'comparison_epoch_{epoch}.png'))
+    plt.close()
+
+    # 指标计算
+    noisy_pil = Image.fromarray((noisy_img * 255).astype(np.uint8))
+    output_pil = Image.fromarray((output_img * 255).astype(np.uint8))
+    metrics = Metrics(noisy_pil, output_pil)
+    psnr = metrics.psnr()
+    ssim = metrics.ssim()
+    ber = metrics.ber()
+    print(f'Epoch {epoch} - PSNR: {psnr}, SSIM: {ssim}, BER: {ber}')
+
 
 # 训练循环
-def train(model, device, train_loader, optimizer, epoch, log_interval=100):
-
+def train(model, device, train_loader, optimizer, epoch):
     model.train()
-    PSNR = []
-    SSIM = []
-    BER = []
-    for batch_idx, (data, target) in enumerate(train_loader):
-
-        # 添加噪声到输入数据
+    for batch_idx, (data, _) in tqdm(enumerate(train_loader), total=len(train_loader), desc=f"Epoch {epoch}"):
+        data = data.to(device)
         noise = Noiser('random')
-        noise.add_noise_layer(layer=GaussianNoise())
-        noise.add_noise_layer(layer=JpegCompression(device))
-        noise.add_noise_layer(layer=Dropout(keep_ratio_range=(0.4, 0.6)))
-        noise.add_noise_layer(layer=LowpassFilter(kernel_size=3))
-        # noise.add_noise_layer(layer=Cropout(0.3,0.7))
-        # noise.add_noise_layer(layer=Resize((0.5,1.5)))
-        data = noise(data)
-        noisy_data = data.to(device)
-        target = data.to(device)  # 原始干净图像作为目标
+        if epoch % 3 == 0 and epoch != 0:
+            pass
+        else:
+            noise.add_noise_layer(layer=GaussianNoise())
+            noise.add_noise_layer(layer=JpegCompression(device))
+            noise.add_noise_layer(layer=Dropout(keep_ratio_range=(0.4, 0.6)))
+            noise.add_noise_layer(layer=LowpassFilter(kernel_size=3))
+        noisy_data = noise(data)
+        target = data
 
         optimizer.zero_grad()
         output = model(noisy_data)
-        loss = criterion(output, target)
+        loss = nn.MSELoss(reduction='sum')(output, target)
         loss.backward()
         optimizer.step()
 
-        if batch_idx % log_interval == 0:
-            if batch_idx % log_interval == 0:
-                print(
-                    f'Train Epoch: {epoch} [{batch_idx * len(data)}/{len(train_loader.dataset)} ({100. * batch_idx / len(train_loader):.0f}%)]\tLoss: {loss.item():.6f}')
-                # 保存模型
-                torch.save(model.state_dict(), f'{save_model_dir}/model_epoch_{epoch}_batch_{batch_idx}.pth')
+        # 每5个epoch并且是epoch中的第一个batch，进行图像保存和指标评估
+        if epoch % 5 == 0 and batch_idx == 0:
+            visualize_and_metrics(epoch, noisy_data, output)
 
-                # 可视化第一个样本的输入和输出
-                fig, axs = plt.subplots(1, 2, figsize=(10, 5))
-                # 显示输入图像
-                axs[0].imshow(noisy_data[0].cpu().detach().numpy().transpose(1, 2, 0))
-                axs[0].set_title('Input Image')
-                axs[0].axis('off')
-                # 显示输出图像
-                axs[1].imshow(output[0].cpu().detach().numpy().transpose(1, 2, 0))
-                axs[1].set_title('Output Image')
-                axs[1].axis('off')
-                plt.show()
-
-                # 评估指标
-                save_image(noisy_data[0], 'temp_input.png')
-                save_image(output[0], 'temp_output.png')
-                metrics = Metrics(Image.open('temp_input.png'), Image.open('temp_output.png'))
-                psnr = metrics.psnr()
-                PSNR.append(psnr)
-                ssim = metrics.ssim()
-                SSIM.append(ssim)
-                ber = metrics.ber()
-                BER.append(ber)
-            print(
-                f'Train Epoch: {epoch} [{batch_idx * len(data)}/{len(train_loader.dataset)} ({100. * batch_idx / len(train_loader):.0f}%)]\tLoss: {loss.item():.6f}')
-            print(
-                f'Average PSNR: {np.mean(PSNR):.2f}, Average SSIM: {np.mean(SSIM):.4f}, Average BER: {np.mean(BER):.4f}')
+    # 保存模型状态
+    torch.save(model.state_dict(), os.path.join(save_model_dir, f'model_epoch_{epoch}.pth'))
 
 
-# 运行训练
-for epoch in range(1, 11):
-    train(denoise_model, device, train_loader, optimizer, epoch)
+# 主函数
+if __name__ == "__main__":
+    train_loader = load_data()
+    model = DenoiseNet(input_channels=3, output_channels=3).to(device)
+    optimizer = optim.Adam(model.parameters(), lr=lr)
+    criterion = nn.MSELoss(reduction='sum')
+
+    for epoch in range(1, epochs + 1):
+        train(model, device, train_loader, optimizer, epoch)
+

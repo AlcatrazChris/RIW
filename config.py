@@ -1,6 +1,6 @@
 #Hyperparamenters
 clamp = 2.0
-batch_size = 2
+batch_size = 16
 val_batch_size = 4
 test_batch_size = 2
 init_scale = 0.9
