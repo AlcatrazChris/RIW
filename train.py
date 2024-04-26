@@ -67,17 +67,17 @@ def train():
             # output_z = output.narrow(1, 4 * config.channels_in, output.shape[1] - 4 * config.channels_in)
             # output_z = utils.gauss_noise(output_z.shape, device)
             '''noise layer'''
-            if epoch % 3 == 0:
+            if epoch % 3 == 0 and epoch != 0:
                 pass
             else:
-                noise = Noiser(mode = 'none')
+                noise = Noiser(mode = 'random')
                 noise.add_noise_layer(layer=GaussianNoise())
                 noise.add_noise_layer(layer=JpegCompression(device))
                 noise.add_noise_layer(layer=Dropout(keep_ratio_range=(0.4, 0.6)))
+                noise.add_noise_layer(layer=LowpassFilter(kernel_size=3))
                 # noise.add_noise_layer(layer=Cropout(0.3,0.7))
                 # noise.add_noise_layer(layer=Resize((0.5,1.5)))
                 img = noise(steg)
-
                 output_steg = dwt(img)
             '''decoder'''
             output_steg = output_steg.to(device)
@@ -119,7 +119,7 @@ def train():
         logger.info(f"Epoch: {epoch+1}/{config.epoch}, Current lr: {current_lr}, Loss: {epoch_loss[0].item():3f},"
                     f"g_loss: {g_loss[0].item():3f}|r_loss: {r_loss[0].item():3f}|l_loss: {l_loss[0].item():3f}")
         print(f"Current lr: {current_lr}  |Loss: {epoch_loss[0].item():3f}|g_loss: {g_loss[0].item():3f}|"
-              f"r_loss: {r_loss[0].item():3}|l_loss: {l_loss[0].item():3}|h_loss：{h_loss[0].item():3f}")
+              f"r_loss: {r_loss[0].item():3}|l_loss: {l_loss[0].item():3}")
 
         #val
         if (epoch+1) % config.val_freq == 0:
@@ -161,11 +161,11 @@ def train():
                     secret_rev = iwt(secret_rev, device)
 
                     '''save images'''
-                    utils.save_images('result/val_images', cover, secret, steg, secret_rev,epoch = val_epoch,id = idx)
+                    utils.save_images('runs/val_images', cover, secret, steg, secret_rev,epoch = val_epoch,id = idx)
 
                     '''calculate metrics'''
-                    metrics = Metrics(Image.open(f'result/val_images/secret/secret_{val_epoch}_{idx:03d}.png'),
-                                      Image.open(f'result/val_images/secret_rev/secret_rev_{val_epoch}_{idx:03d}.png'))
+                    metrics = Metrics(Image.open(f'runs/val_images/secret/secret_{val_epoch}_{idx:03d}.png'),
+                                      Image.open(f'runs/val_images/secret_rev/secret_rev_{val_epoch}_{idx:03d}.png'))
                     psnr = metrics.psnr()
                     PSNR.append(psnr)
                     ssim = metrics.ssim()

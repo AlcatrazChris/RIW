@@ -4,15 +4,15 @@ batch_size = 2
 val_batch_size = 4
 test_batch_size = 2
 init_scale = 0.9
-lr = 5e-8
+lr = 1e-8
 weight_decay = 1e-4
 betas = (0.5, 0.999)
 epoch = 1000
 
 channels_in = 3
 
-lamda_guide = 1
-lamda_reconstruction = 7
+lamda_guide = 3
+lamda_reconstruction = 5
 lamda_low_frequency = 1
 lamda_color_l = 5
 
