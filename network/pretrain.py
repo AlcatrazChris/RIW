@@ -18,9 +18,9 @@ from tqdm import tqdm
 from PIL import Image
 
 # 设置超参数和设备
-batch_size = 16
-epochs = 500
-lr = 0.01
+batch_size = 2
+epochs = 100
+lr = 0.001
 save_model_dir = '../model/pretrain'
 save_image_dir = '../runs/pretrain'
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -41,20 +41,25 @@ def load_data():
     return train_loader
 
 # 可视化和指标评估
-def visualize_and_metrics(epoch, noisy_data, output):
+def visualize_and_metrics(epoch, original, noisy_data, output):
     # 确保张量在转换为NumPy数组前已经移至CPU
+    original = original[0].cpu().detach().clamp(0, 1).numpy().transpose(1, 2, 0)
     noisy_img = noisy_data[0].cpu().detach().clamp(0, 1).numpy().transpose(1, 2, 0)
     output_img = output[0].cpu().detach().clamp(0, 1).numpy().transpose(1, 2, 0)
 
     # 绘制并保存图像而不是显示
-    fig, axs = plt.subplots(1, 2, figsize=(12, 6))
-    axs[0].imshow(noisy_img)
-    axs[0].set_title('Noisy Image')
+    fig, axs = plt.subplots(1, 3, figsize=(18, 7))
+    axs[0].imshow(original)
+    axs[0].set_title('Original Image')
     axs[0].axis('off')
 
-    axs[1].imshow(output_img)
-    axs[1].set_title('Denoised Image')
+    axs[1].imshow(noisy_img)
+    axs[1].set_title('Noisy Image')
     axs[1].axis('off')
+
+    axs[2].imshow(output_img)
+    axs[2].set_title('Denoised Image')
+    axs[2].axis('off')
 
     # 图像保存路径
     plt.savefig(os.path.join(save_image_dir, f'comparison_epoch_{epoch}.png'))
@@ -73,6 +78,7 @@ def visualize_and_metrics(epoch, noisy_data, output):
 # 训练循环
 def train(model, device, train_loader, optimizer, epoch):
     model.train()
+    Loss = []
     for batch_idx, (data, _) in tqdm(enumerate(train_loader), total=len(train_loader), desc=f"Epoch {epoch}"):
         data = data.to(device)
         noise = Noiser('random')
@@ -91,11 +97,12 @@ def train(model, device, train_loader, optimizer, epoch):
         loss = nn.MSELoss(reduction='sum')(output, target)
         loss.backward()
         optimizer.step()
+        Loss.append([loss.item(),0.])
 
         # 每5个epoch并且是epoch中的第一个batch，进行图像保存和指标评估
         if epoch % 5 == 0 and batch_idx == 0:
-            visualize_and_metrics(epoch, noisy_data, output)
-
+            visualize_and_metrics(epoch,data, noisy_data, output)
+    print(f'Loss:{np.mean(np.array(Loss),axis=0)[0].item():3f}')
     # 保存模型状态
     torch.save(model.state_dict(), os.path.join(save_model_dir, f'model_epoch_{epoch}.pth'))
 
