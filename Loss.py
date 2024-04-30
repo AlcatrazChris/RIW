@@ -25,3 +25,8 @@ def histogram_loss(hist_input, gt_input, device):
     hist_loss = LabLoss()
     loss = hist_loss(hist_input, gt_input)
     return loss.to(device)
+
+def denoider_loss(original, denoised, device):
+    loss_fn = torch.nn.MSELoss(reduction='sum')
+    loss = loss_fn(original, denoised)
+    return loss.to(device)

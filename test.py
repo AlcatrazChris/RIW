@@ -9,8 +9,9 @@ from PIL import Image
 from metrics import Metrics
 from model import Model
 from network.waveletTrans import DWT,IWT
-from network.LowPassfitter import LowPassFilter
+from network.LowPassfitter import LowpassFilter
 from noise.noiser import Noiser
+from noise.jpeg_compression import JpegCompression
 from noise.guassian import GaussianNoise
 from noise.dropout import Dropout
 # from noise.crop import Crop
@@ -42,20 +43,20 @@ def calculate_metrics(pred, target, logger, id):
 
 #setup
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-logger = utils.log_starter("test_log", "result/log/", level=logging.INFO, out='tofile')
-model = Model(8).to(device)
+logger = utils.log_starter("test_log", "run/log/", level=logging.INFO, out='tofile')
+model = Model(16).to(device)
 utils.init_model(model, device=device)
 params_trainable = list(filter(lambda p: p.requires_grad, model.parameters()))
 optim = torch.optim.Adam(params_trainable, lr=config.lr, betas=config.betas, eps=1e-6, weight_decay=config.weight_decay)
 weight_scheduler = torch.optim.lr_scheduler.StepLR(optim, config.weight_step, gamma=config.gamma)
 
 # utils.load_from_hinet('model/model.pt',model=model, device=device,optim=optim)
-utils.load_from_hinet('model/model_90_val.pt', model, optim,device)
+utils.load_from_hinet('model/model_325_val.pt', model, optim,device)
 # load('model/model_290_val.pt')
 model.eval()
 dwt, iwt = DWT(), IWT()
 test_data = utils.get_dataloader(type='test')
-lpf = LowPassFilter(kernel_size=3)
+lpf = LowpassFilter(kernel_size=3)
 PSNR, SSIM, BER = [], [], []
 def test():
     with torch.no_grad():
@@ -79,7 +80,7 @@ def test():
             noise = Noiser()
             # noise.add_noise_layer(layer=GaussianNoise(mean=0.,std=0.05))
             # noise.add_noise_layer(layer=JpegCompression(device))
-            noise.add_noise_layer(layer=Cropout())
+            # noise.add_noise_layer(layer=Cropout())
             # noise.add_noise_layer(RotateImage(30))
             # noise.add_noise_layer(layer=Dropout(keep_ratio_range=(0.4, 0.6)))
             # noise.add_noise_layer(layer=Resize((0.5, 0.7)))

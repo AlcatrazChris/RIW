@@ -41,5 +41,4 @@ class Resize(nn.Module):
                                  (0, original_width - padded_image.shape[3], 0, original_height - padded_image.shape[2]),
                                  mode='constant', value=self.padding_value)
         # print(padded_image.shape)
-
         return padded_image

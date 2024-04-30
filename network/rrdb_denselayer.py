@@ -28,9 +28,9 @@ class ResidualDenseBlock_out(nn.Module):
         self.conv1 = nn.Conv2d(input, 32, 3, 1, 1, bias=bias)
         self.conv2 = nn.Conv2d(input + 32, 32, 3, 1, 1, bias=bias)
         self.conv3 = nn.Conv2d(input + 2 * 32, 32, 3, 1, 1, bias=bias)
-        self.conv4 = nn.Conv2d(input + 3 * 32, output, 3, 1, 1, bias=bias)
+        self.conv4 = nn.Conv2d(input + 3 * 32, 32, 3, 1, 1, bias=bias)
         self.conv5 = nn.Conv2d(input + 4 * 32, output, 3, 1, 1, bias=bias)
-        self.lrelu = nn.LeakyReLU(inplace=True)
+        self.lrelu = nn.LeakyReLU(negative_slope=0.01,inplace=True)
 
         # initialization
         initialize_weights([self.conv5], 0.)
@@ -39,7 +39,6 @@ class ResidualDenseBlock_out(nn.Module):
         x1 = self.lrelu(self.conv1(x))
         x2 = self.lrelu(self.conv2(torch.cat((x, x1), 1)))
         x3 = self.lrelu(self.conv3(torch.cat((x, x1, x2), 1)))
-        x4 = self.conv4(torch.cat((x, x1, x2, x3), 1))
+        x4 = self.lrelu(self.conv4(torch.cat((x, x1, x2, x3), 1)))
         x5 = self.conv5(torch.cat((x, x1, x2, x3, x4), 1))
-
         return x5

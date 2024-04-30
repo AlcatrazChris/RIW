@@ -6,7 +6,7 @@ class Model(nn.Module):
     def __init__(self, nLayer = 16):
         super(Model, self).__init__()
 
-        self.model = InvNet(nLayer)
+        self.model = InvNet(nLayer,input_dim=256)
 
     def forward(self, x, rev=False):
 

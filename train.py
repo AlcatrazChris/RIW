@@ -1,5 +1,6 @@
 import torch
 import logging
+import datetime
 from PIL import Image
 import config
 import utils
@@ -8,13 +9,13 @@ import Loss
 from model import *
 from network.waveletTrans import DWT,IWT
 from network.LowPassfitter import LowpassFilter
+# from network.denoiser import DenoiseNet
 from noise.guassian import GaussianNoise
 from noise.jpeg_compression import JpegCompression
 from noise.noiser import Noiser
-import datetime
+from noise.resize import Resize
 from noise.cropout import Cropout
 from noise.rotate import RotateImage
-# from noise.crop import Crop
 from noise.dropout import Dropout
 from tqdm import tqdm
 from metrics import Metrics
@@ -30,12 +31,14 @@ def train():
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model = Model(8).to(device)
+    # denoiser = DenoiseNet().to(device)
     utils.init_model(model, device=device)
 
     utils.model_structure(model,logger)
     model = torch.nn.DataParallel(model, device_ids=config.device_ids)
     params_trainable = list(filter(lambda p: p.requires_grad, model.parameters()))
     optim = torch.optim.Adam(params_trainable, lr=config.lr, betas=config.betas, eps=1e-8, weight_decay=config.weight_decay)
+    # optim_denoiser = torch.optim.Adam(denoiser.parameters(), lr=0.05, betas=config.betas, eps=1e-8, weight_decay=config.weight_decay)
     weight_scheduler = torch.optim.lr_scheduler.StepLR(optim, config.weight_step, gamma=config.gamma)
     dwt = DWT()
     iwt = IWT()
@@ -46,6 +49,7 @@ def train():
     psnr_values = []
     ssim_values = []
     for epoch in range(config.epoch):
+        dn_loss_history = []
         loss_history = []
         g_loss_history = []
         r_loss_history = []
@@ -62,6 +66,7 @@ def train():
             img_input = torch.cat((cover_input, secret_input), 1)
             # print(f'img_input:{img_input.max()}')
             '''encoder'''
+            # print(img_input.shape)
             output = model(img_input)
             # print(f'Encoder:{output.max()}')
             output_steg = output.narrow(1, 0, 4 * config.channels_in)
@@ -78,8 +83,8 @@ def train():
                 noise.add_noise_layer(layer=JpegCompression(device))
                 noise.add_noise_layer(layer=Dropout(keep_ratio_range=(0.4, 0.6)))
                 noise.add_noise_layer(layer=LowpassFilter(kernel_size=3))
-                # noise.add_noise_layer(layer=Cropout(0.3,0.7))
                 # noise.add_noise_layer(layer=Resize((0.5,1.5)))
+                # noise.add_noise_layer(layer=RotateImage(30))
                 img = noise(steg)
                 output_steg = dwt(img)
             '''decoder'''

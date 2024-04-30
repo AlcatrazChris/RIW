@@ -3,16 +3,19 @@ import torch.nn as nn
 import random
 
 class Noiser(nn.Module):
-    def __init__(self, mode = 'none', layer_num=2):
+    def __init__(self, mode='none', layer_num=2):
         super(Noiser, self).__init__()
         self.mode = mode
         self.layer_num = layer_num
         self.noise_layers = nn.ModuleList([])
+        self.device =torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     def add_noise_layer(self, layer):
-        self.noise_layers.append(layer)
+        # 确保添加的层也在正确的设备上
+        self.noise_layers.append(layer.to(self.device))
 
     def forward(self, x):
+        x = x.to(self.device)  # 确保输入数据在正确的设备上
         n, c, h, w = x.shape
         processed_images = []
 

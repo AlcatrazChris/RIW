@@ -1,21 +1,21 @@
-from model import *
 from network.invblock import INV_block
-
+import torch.nn as nn
+from network.DNAutoencoer import DenoisingAutoencoder
+from network.denoiser import DenoiseNet
 
 class InvNet(nn.Module):
-
-    def __init__(self, nLayer):
+    def __init__(self, nLayer, input_dim):
         super(InvNet, self).__init__()
-        self.inv = nn.ModuleList([INV_block() for _ in range(nLayer)])
+        self.inv_blocks = nn.ModuleList([INV_block() for _ in range(nLayer)])
+        self.denoiser = DenoiseNet(24,24)
 
     def forward(self, x, rev=False):
-        out = x
         if not rev:
-            for inv in self.inv:
-                out = inv(out)
+            for block in self.inv_blocks:
+                x = block(x)
         else:
-            for inv in reversed(self.inv):
-                out = inv(out, rev=True)
-        return out
+            for block in reversed(self.inv_blocks):
+                x = block(x, rev=True)
+        return x
 
-
+# Example usage

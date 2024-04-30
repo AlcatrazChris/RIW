@@ -60,9 +60,8 @@ class JpegCompression(nn.Module):
         super(JpegCompression, self).__init__()
         self.device = device
 
-        self.dct_conv_weights = torch.tensor(gen_filters(8, 8, dct_coeff), dtype=torch.float32).to(device).unsqueeze(1)
-        self.idct_conv_weights = torch.tensor(gen_filters(8, 8, idct_coeff), dtype=torch.float32).to(device).unsqueeze(1)
-
+        self.dct_conv_weights = torch.tensor(gen_filters(8, 8, dct_coeff), dtype=torch.float32).unsqueeze(1).to(device)
+        self.idct_conv_weights = torch.tensor(gen_filters(8, 8, idct_coeff), dtype=torch.float32).unsqueeze(1).to(device)
         self.yuv_keep_weights = yuv_keep_weights
         self.jpeg_mask = None
         self.create_mask((1024, 1024))
@@ -85,12 +84,16 @@ class JpegCompression(nn.Module):
 
     def apply_conv(self, image, filter_type: str):
         filters = self.dct_conv_weights if filter_type == 'dct' else self.idct_conv_weights
+        image = image.to(self.device)  # 确保输入图像也在正确的设备上
         image_conv_channels = []
         for channel in range(image.shape[1]):
             image_yuv_ch = image[:, channel, :, :].unsqueeze(1)
             image_conv = F.conv2d(image_yuv_ch, filters, stride=8)
-            image_conv = image_conv.permute(0, 2, 3, 1).view(image_conv.shape[0], image_conv.shape[3],image_conv.shape[2], 8, 8).permute(0, 1, 3, 2, 4).contiguous()
-            image_conv = image_conv.view(image_conv.shape[0], image_conv.shape[1] * image_conv.shape[2],image_conv.shape[3] * image_conv.shape[4]).unsqueeze(1)
+            image_conv = image_conv.permute(0, 2, 3, 1).view(image_conv.shape[0], image_conv.shape[3],
+                                                             image_conv.shape[2], 8, 8).permute(0, 1, 3, 2,
+                                                                                                4).contiguous()
+            image_conv = image_conv.view(image_conv.shape[0], image_conv.shape[1] * image_conv.shape[2],
+                                         image_conv.shape[3] * image_conv.shape[4]).unsqueeze(1)
             image_conv_channels.append(image_conv)
         return torch.cat(image_conv_channels, dim=1)
 

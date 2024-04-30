@@ -1,4 +1,5 @@
 import os
+import random
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
@@ -11,6 +12,7 @@ from noise.noiser import Noiser
 from noise.dropout import Dropout
 from noise.guassian import GaussianNoise
 from noise.jpeg_compression import JpegCompression
+from noise.rotate import RotateImage
 from network.LowPassfitter import LowpassFilter
 from torchvision.utils import save_image
 from metrics import Metrics
@@ -85,10 +87,11 @@ def train(model, device, train_loader, optimizer, epoch):
         if epoch % 3 == 0 and epoch != 0:
             pass
         else:
-            noise.add_noise_layer(layer=GaussianNoise())
+            noise.add_noise_layer(layer=GaussianNoise(mean=0., std=0.01*random.randrange(1,50,5)))
             noise.add_noise_layer(layer=JpegCompression(device))
-            noise.add_noise_layer(layer=Dropout(keep_ratio_range=(0.4, 0.6)))
+            noise.add_noise_layer(layer=Dropout(keep_ratio_range=(0.2, 0.6)))
             noise.add_noise_layer(layer=LowpassFilter(kernel_size=3))
+            noise.add_noise_layer(layer=RotateImage(degrees=random.randint(15,75)))
         noisy_data = noise(data)
         target = data
 
@@ -110,7 +113,8 @@ def train(model, device, train_loader, optimizer, epoch):
 # 主函数
 if __name__ == "__main__":
     train_loader = load_data()
-    model = DenoiseNet(input_channels=3, output_channels=3).to(device)
+    model = DenoiseNet(input_channels=3, output_channels=3)
+    model = model.to(device)
     optimizer = optim.Adam(model.parameters(), lr=lr)
     criterion = nn.MSELoss(reduction='sum')
 
