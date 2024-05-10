@@ -55,6 +55,8 @@ def train():
         r_loss_history = []
         l_loss_history = []
         h_loss_history = []
+        c_loss_history = []
+        t_loss_history = []
         #train
         for data,_ in tqdm(train_data,desc=f"train_epoch_{epoch+1}", leave=True, unit='it'):
             '''initialization'''
@@ -96,17 +98,20 @@ def train():
             secret_rev = output_image.narrow(1, 4 * config.channels_in, output_image.shape[1] - 4 * config.channels_in)
             secret_rev = iwt(secret_rev, device)
             '''calculate loss'''
-            # print(steg)
+            # print(steg.shape)
             g_loss = Loss.guide_loss(steg, cover, device=device)
             r_loss = Loss.reconstruction_loss(secret_rev, secret, device=device)
             h_loss = Loss.histogram_loss(steg, cover, device=device)
+            c_loss = Loss.color_loss(steg,cover,device=device)
+            t_loss = Loss.texture_loss(steg,cover,device=device)    
             steg_low = output_steg.narrow(1, 0, config.channels_in)
             cover_low = cover_input.narrow(1, 0, config.channels_in)
             l_loss = Loss.low_frequency_loss(steg_low, cover_low, device=device)
 
             # total_loss = config.lamda_reconstruction * r_loss + config.lamda_guide * g_loss + config.lamda_low_frequency * l_loss
-            total_loss = config.lamda_guide * g_loss + config.lamda_reconstruction * r_loss
+            # total_loss = config.lamda_guide * g_loss + config.lamda_reconstruction * r_loss +  config.lamda_low_frequency * c_loss
             # total_loss = config.lamda_guide * g_loss
+            total_loss = 10 * r_loss + 5 * g_loss + 5 * t_loss + 10 * l_loss
             total_loss.backward()
             # torch.nn.utils.clip_grad_norm_(model.parameters(), 1e7)
             optim.step()
@@ -117,17 +122,21 @@ def train():
             l_loss_history.append([l_loss.item(), 0.])
             r_loss_history.append([r_loss.item(), 0.])
             h_loss_history.append([h_loss.item(), 0.])
+            c_loss_history.append([c_loss.item(), 0.])
+            t_loss_history.append([t_loss.item(), 0.])
 
         epoch_loss = np.mean(np.array(loss_history),axis=0)
         g_loss = np.mean(np.array(g_loss_history),axis=0)
         l_loss = np.mean(np.array(l_loss_history),axis=0)
         r_loss = np.mean(np.array(r_loss_history),axis=0)
+        t_loss = np.mean(np.array(t_loss_history),axis=0)
+        c_loss = np.mean(np.array(c_loss_history),axis=0)
         # h_loss = np.mean(np.array(h_loss_history),axis=0)
         current_lr = optim.param_groups[0]['lr']
         logger.info(f"Epoch: {epoch+1}/{config.epoch}, Current lr: {current_lr}, Loss: {epoch_loss[0].item():3f},"
-                    f"g_loss: {g_loss[0].item():3f}|r_loss: {r_loss[0].item():3f}|l_loss: {l_loss[0].item():3f}")
+                    f"g_loss: {g_loss[0].item():3f}|r_loss: {r_loss[0].item():3f}|l_loss: {l_loss[0].item():3f}|t_loss: {t_loss[0].item():3f}")
         print(f"Current lr: {current_lr}  |Loss: {epoch_loss[0].item():3f}|g_loss: {g_loss[0].item():3f}|"
-              f"r_loss: {r_loss[0].item():3}|l_loss: {l_loss[0].item():3}")
+              f"r_loss: {r_loss[0].item():3}|l_loss: {l_loss[0].item():3}|t_loss: {t_loss[0].item():3f}")
 
         #val
         if (epoch+1) % config.val_freq == 0:
