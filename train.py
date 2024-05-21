@@ -74,17 +74,17 @@ def train():
             output_steg = output.narrow(1, 0, 4 * config.channels_in)
             steg = iwt(output_steg, device)
             # steg = lpf(steg)
-            # output_z = output.narrow(1, 4 * config.channels_in, output.shape[1] - 4 * config.channels_in)
-            # output_z = utils.gauss_noise(output_z.shape, device)
+            output_z = output.narrow(1, 4 * config.channels_in, output.shape[1] - 4 * config.channels_in)
+            output_z = utils.gauss_noise(output_z.shape, device)
             '''noise layer'''
             if epoch % 3 == 0 and epoch != 0:
                 pass
             else:
                 noise = Noiser(mode = 'random')
-                noise.add_noise_layer(layer=GaussianNoise())
-                noise.add_noise_layer(layer=JpegCompression(device))
-                noise.add_noise_layer(layer=Dropout(keep_ratio_range=(0.4, 0.6)))
-                noise.add_noise_layer(layer=LowpassFilter(kernel_size=3))
+                # noise.add_noise_layer(layer=GaussianNoise())
+                # noise.add_noise_layer(layer=JpegCompression(device))
+                # noise.add_noise_layer(layer=Dropout(keep_ratio_range=(0.4, 0.6)))
+                # noise.add_noise_layer(layer=LowpassFilter(kernel_size=3))
                 # noise.add_noise_layer(layer=Resize((0.5,1.5)))
                 # noise.add_noise_layer(layer=RotateImage(30))
                 img = noise(steg)
@@ -92,7 +92,7 @@ def train():
             '''decoder'''
             output_steg = output_steg.to(device)
             random_init = torch.randn_like(output_steg,dtype=torch.float32).to(device)
-            output_rev = torch.cat((output_steg, random_init), 1)
+            output_rev = torch.cat((output_steg, output_z), 1)
             output_image = model(output_rev, rev=True)
             # print(f'Decoder:{output_image.max()}')
             secret_rev = output_image.narrow(1, 4 * config.channels_in, output_image.shape[1] - 4 * config.channels_in)
@@ -111,9 +111,9 @@ def train():
             # total_loss = config.lamda_reconstruction * r_loss + config.lamda_guide * g_loss + config.lamda_low_frequency * l_loss
             # total_loss = config.lamda_guide * g_loss + config.lamda_reconstruction * r_loss +  config.lamda_low_frequency * c_loss
             # total_loss = config.lamda_guide * g_loss
-            total_loss = 10 * r_loss + 5 * g_loss + 5 * t_loss + 10 * l_loss
+            # total_loss = 20 * r_loss + 2 * g_loss + 2 * t_loss + 5 * l_loss
+            total_loss = 10 * r_loss+ 1 * g_loss
             total_loss.backward()
-            # torch.nn.utils.clip_grad_norm_(model.parameters(), 1e7)
             optim.step()
             optim.zero_grad()
 

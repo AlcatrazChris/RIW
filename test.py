@@ -43,21 +43,22 @@ def calculate_metrics(pred, target, logger, id):
 
 #setup
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-logger = utils.log_starter("test_log", "run/log/", level=logging.INFO, out='tofile')
-model = Model(16).to(device)
+logger = utils.log_starter("test_log", "runs/log/", level=logging.INFO, out='tofile')
+model = Model(8).to(device)
 utils.init_model(model, device=device)
 params_trainable = list(filter(lambda p: p.requires_grad, model.parameters()))
 optim = torch.optim.Adam(params_trainable, lr=config.lr, betas=config.betas, eps=1e-6, weight_decay=config.weight_decay)
 weight_scheduler = torch.optim.lr_scheduler.StepLR(optim, config.weight_step, gamma=config.gamma)
 
-# utils.load_from_hinet('model/model.pt',model=model, device=device,optim=optim)
-utils.load_from_hinet('model/model_325_val.pt', model, optim,device)
+utils.load_from_hinet('model/model_580_val.pt',model=model, device=device,optim=optim)
+# load('model/best10_0517.pt')
 # load('model/model_290_val.pt')
 model.eval()
 dwt, iwt = DWT(), IWT()
 test_data = utils.get_dataloader(type='test')
 lpf = LowpassFilter(kernel_size=3)
-PSNR, SSIM, BER = [], [], []
+PSNR_C, SSIM_C, BER_C = [], [], []
+PSNR_S, SSIM_S, BER_S = [], [], []
 def test():
     with torch.no_grad():
         for id, (data, target) in enumerate(test_data):
@@ -100,14 +101,19 @@ def test():
             utils.save_images(config.IMAGE_PATH,cover, secret, steg, secret_rev, id=id)
 
             '''calculate metrics'''
-            metrics = Metrics(Image.open(config.IMAGE_PATH+'/secret/secret_' + '%.3d.png' % id), Image.open(config.IMAGE_PATH+'/secret_rev/secret_rev_' + '%.3d.png' % id))
-            psnr = metrics.psnr()
-            PSNR.append(psnr)
-            ssim = metrics.ssim()
-            SSIM.append(ssim)
-            ber = metrics.ber()
-            BER.append(ber)
-            logger.info(f"id:{id}: PSNR: {psnr:.4f}| SSIM: {ssim:4f}| BER: {ber:.4f}")
-        logger.info(f"Avg PSNR:{np.mean(PSNR)},Avg SSIM:{np.mean(SSIM)}")
+            metrics_s = Metrics(Image.open(config.IMAGE_PATH+'/secret/secret_' + '%.3d.png' % id), Image.open(config.IMAGE_PATH+'/secret_rev/secret_rev_' + '%.3d.png' % id))
+            metrics_c = Metrics(Image.open(config.IMAGE_PATH+'/cover/cover_'+ '%.3d.png' % id),Image.open(config.IMAGE_PATH+'/steg/steg_' + '%.3d.png' % id))
+            psnr_c = metrics_c.psnr()
+            psnr_s = metrics_s.psnr()
+            PSNR_C.append(psnr_c)
+            PSNR_S.append(psnr_s)
+            ssim_c = metrics_c.ssim()
+            ssim_s = metrics_s.ssim()
+            SSIM_C.append(ssim_c)
+            SSIM_S.append(ssim_s)
+            # ber = metrics.ber()
+            # BER.append(ber)
+            logger.info(f"id:{id}: PSNR_C: {psnr_c:.4f}| SSIM_C: {ssim_c:4f}| PSNR_S:{psnr_s:4f}| SSIM_S:{ssim_s}")
+        logger.info(f"Avg PSNR_C:{np.mean(PSNR_C)},Avg SSIM_C:{np.mean(SSIM_C)},Avg PSNR_S:{np.mean(PSNR_S)},Avg SSIM_S:{np.mean(SSIM_S)}")
 
 test()

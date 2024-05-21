@@ -168,7 +168,8 @@ def load_from_hinet(model_path, model, optim, device):
     new_net = {}
     for key, value in net.items():
         if 'tmp_var' not in key:
-            new_key = re.sub(r"module\.model\.inv\.(\d+)", lambda m: "model.inv.{}".format(int(m.group(1))), key)
+            new_key = re.sub(r"module\.model\.inv_blocks\.(\d+)", lambda m: "model.inv_blocks.{}".format(int(m.group(1))), key)
+            # new_key = re.sub(r"module\.model\.inv(\d+)\.", lambda m: "model.inv_blocks.{}.".format(int(m.group(1)) - 1), key)
             new_net[new_key] = value
 
     # 打印新的 keys，帮助识别问题

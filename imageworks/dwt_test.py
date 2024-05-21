@@ -29,7 +29,7 @@ def save_combined_image(images, filename):
 # 加载和转换图像
 output_dir = 'dwt_result/'
 os.makedirs(output_dir, exist_ok=True)
-image_path = '../result/images/steg/steg_002.png'  # 替换为你的图片路径
+image_path = 'lena_mini.jpg'  # 替换为你的图片路径
 image = Image.open(image_path)  # 不转换为灰度图
 transform = transforms.Compose([
     transforms.ToTensor(),  # 转换为张量
